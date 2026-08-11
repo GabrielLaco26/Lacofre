@@ -1,0 +1,16 @@
+node_modules/
+npm-debug.log*
+
+# Banco de dados local (contém dados reais de usuários)
+backend/*.db
+backend/*.db-journal
+
+# Exportações de CSV (dados pessoais)
+*.csv
+
+# Configuração local do Claude Code
+.claude/settings.local.json
+
+# SO
+.DS_Store
+Thumbs.db
