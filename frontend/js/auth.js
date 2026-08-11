@@ -16,7 +16,9 @@ const loginError = document.getElementById('login-error');
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   loginError.textContent = '';
+  const submitBtn = loginForm.querySelector('button[type="submit"]');
 
+  uiLoading.setButtonLoading(submitBtn, true, 'Entrando...');
   try {
     await api.login({
       email: loginForm.email.value.trim(),
@@ -25,6 +27,7 @@ loginForm.addEventListener('submit', async (event) => {
     window.location.href = 'index.html';
   } catch (error) {
     loginError.textContent = error.message;
+    uiLoading.setButtonLoading(submitBtn, false);
   }
 });
 
@@ -34,7 +37,9 @@ const cadastroError = document.getElementById('cadastro-error');
 cadastroForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   cadastroError.textContent = '';
+  const submitBtn = cadastroForm.querySelector('button[type="submit"]');
 
+  uiLoading.setButtonLoading(submitBtn, true, 'Criando conta...');
   try {
     await api.register({
       name: cadastroForm.name.value.trim(),
@@ -44,6 +49,7 @@ cadastroForm.addEventListener('submit', async (event) => {
     window.location.href = 'index.html';
   } catch (error) {
     cadastroError.textContent = error.message;
+    uiLoading.setButtonLoading(submitBtn, false);
   }
 });
 

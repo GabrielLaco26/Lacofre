@@ -9,6 +9,24 @@ window.transactionsView = (() => {
   let allTransactions = [];
   let currentPage = 1;
 
+  function skeletonRow() {
+    return `
+      <tr class="skeleton-row">
+        <td><span class="skeleton skeleton-text" style="width:70%"></span></td>
+        <td><span class="skeleton skeleton-text" style="width:55%"></span></td>
+        <td><span class="skeleton skeleton-text" style="width:60px"></span></td>
+        <td><span class="skeleton skeleton-text" style="width:70px"></span></td>
+        <td class="align-right"><span class="skeleton skeleton-text" style="width:80px"></span></td>
+        <td></td>
+      </tr>
+    `;
+  }
+
+  function showSkeletonRows() {
+    tbody.innerHTML = Array.from({ length: 5 }, skeletonRow).join('');
+    pagination.innerHTML = '';
+  }
+
   function renderRows() {
     if (allTransactions.length === 0) {
       tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhuma transação registrada ainda.</td></tr>';
@@ -100,13 +118,13 @@ window.transactionsView = (() => {
 
     if (deleteBtn) {
       if (!confirm('Excluir esta transação?')) return;
-      deleteBtn.disabled = true;
+      uiLoading.setButtonLoading(deleteBtn, true, 'Excluindo...');
       try {
         await api.deleteTransaction(deleteBtn.dataset.id);
         document.dispatchEvent(new CustomEvent('transactions:changed'));
         toast.success('Transação excluída.');
       } catch (error) {
-        deleteBtn.disabled = false;
+        uiLoading.setButtonLoading(deleteBtn, false);
         toast.error(error.message);
       }
     }
@@ -168,13 +186,13 @@ window.transactionsView = (() => {
     const file = importInput.files[0];
     importInput.value = '';
     if (!file) return;
-    importBtn.disabled = true;
+    uiLoading.setButtonLoading(importBtn, true, 'Importando...');
     try {
       await importCsv(file);
     } catch (error) {
       toast.error('Não foi possível ler o arquivo CSV.');
     } finally {
-      importBtn.disabled = false;
+      uiLoading.setButtonLoading(importBtn, false);
     }
   });
 
@@ -182,7 +200,12 @@ window.transactionsView = (() => {
 
   async function render() {
     try {
-      allTransactions = await api.getTransactions();
+      await uiLoading.withDelayedSkeleton(
+        async () => {
+          allTransactions = await api.getTransactions();
+        },
+        { onShow: showSkeletonRows }
+      );
       renderRows();
     } catch (error) {
       console.error(error);
