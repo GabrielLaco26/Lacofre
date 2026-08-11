@@ -31,11 +31,22 @@ const transactionModal = (() => {
   }
 
   function open() {
+    overlay.classList.remove('closing');
     overlay.hidden = false;
   }
 
   function close() {
-    overlay.hidden = true;
+    if (overlay.hidden || overlay.classList.contains('closing')) return;
+
+    const modalEl = overlay.querySelector('.modal');
+    overlay.classList.add('closing');
+
+    const finish = () => {
+      overlay.hidden = true;
+      overlay.classList.remove('closing');
+      modalEl.removeEventListener('animationend', finish);
+    };
+    modalEl.addEventListener('animationend', finish);
   }
 
   function openForCreate() {
@@ -91,8 +102,10 @@ const transactionModal = (() => {
       category: categorySelect.value,
     };
 
+    const isEdit = Boolean(idInput.value);
+    uiLoading.setButtonLoading(submitBtn, true, isEdit ? 'Salvando...' : 'Adicionando...');
+
     try {
-      const isEdit = Boolean(idInput.value);
       if (isEdit) {
         await api.updateTransaction(idInput.value, payload);
       } else {
@@ -103,6 +116,8 @@ const transactionModal = (() => {
       toast.success(isEdit ? 'Transação atualizada com sucesso.' : 'Transação adicionada com sucesso.');
     } catch (error) {
       errorEl.textContent = error.message;
+    } finally {
+      uiLoading.setButtonLoading(submitBtn, false);
     }
   });
 

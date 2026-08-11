@@ -8,8 +8,8 @@ backend/*.db-journal
 # Exportações de CSV (dados pessoais)
 *.csv
 
-# Configuração local do Claude Code
-.claude/settings.local.json
+# Estado local/runtime do Claude Code (não é código do projeto)
+.claude/
 
 # SO
 .DS_Store

@@ -67,6 +67,7 @@ window.profileView = (() => {
       return;
     }
 
+    avatarEl.classList.add('is-uploading');
     try {
       const dataUrl = await readAndResizeImage(file);
       avatarEl.innerHTML = `<img src="${dataUrl}" alt="Foto de perfil" />`;
@@ -75,6 +76,8 @@ window.profileView = (() => {
       toast.success('Foto de perfil atualizada.');
     } catch (error) {
       toast.error(error.message || 'Não foi possível atualizar a foto.');
+    } finally {
+      avatarEl.classList.remove('is-uploading');
     }
   }
 
@@ -116,7 +119,9 @@ window.profileView = (() => {
     event.preventDefault();
     errorEl.textContent = '';
     successEl.textContent = '';
+    const submitBtn = form.querySelector('button[type="submit"]');
 
+    uiLoading.setButtonLoading(submitBtn, true, 'Salvando...');
     try {
       const updated = await api.updateProfile({
         name: nameInput.value.trim(),
@@ -127,6 +132,8 @@ window.profileView = (() => {
       toast.success('Perfil atualizado com sucesso.');
     } catch (error) {
       errorEl.textContent = error.message;
+    } finally {
+      uiLoading.setButtonLoading(submitBtn, false);
     }
   });
 

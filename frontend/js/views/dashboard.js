@@ -13,8 +13,18 @@ window.dashboardView = (() => {
   const categoryEmpty = document.getElementById('category-chart-empty');
   const categoryLegend = document.getElementById('category-legend');
 
+  const SUMMARY_VALUE_ELS = [totalEntradasEl, totalSaidasEl, saldoAtualEl];
+
   let allTransactions = [];
   let customRange = null;
+  let picker = null;
+  let initialized = false;
+
+  const today = new Date();
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const firstOfYear = new Date(today.getFullYear(), 0, 1);
+  const lastOfYear = new Date(today.getFullYear(), 11, 31);
 
   function toIso(date) {
     const y = date.getFullYear();
@@ -23,9 +33,20 @@ window.dashboardView = (() => {
     return `${y}-${m}-${d}`;
   }
 
+  const monthRange = { start: toIso(firstOfMonth), end: toIso(lastOfMonth) };
+  const yearRange = { start: toIso(firstOfYear), end: toIso(lastOfYear) };
+
   function withinPeriod(dateStr) {
     if (!customRange) return true;
     return dateStr >= customRange.start && dateStr <= customRange.end;
+  }
+
+  function showSkeleton() {
+    SUMMARY_VALUE_ELS.forEach((el) => el.classList.add('skeleton', 'skeleton-text'));
+  }
+
+  function hideSkeleton() {
+    SUMMARY_VALUE_ELS.forEach((el) => el.classList.remove('skeleton', 'skeleton-text'));
   }
 
   function draw() {
@@ -54,23 +75,6 @@ window.dashboardView = (() => {
     chartsManager.renderCategoryChart(categoryCanvas, categoryEmpty, categoryLegend, categoryTotals);
   }
 
-  async function render() {
-    try {
-      allTransactions = await api.getTransactions();
-      draw();
-    } catch (error) {
-      console.error(error);
-    }
-  }
-
-  const today = new Date();
-  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  const firstOfYear = new Date(today.getFullYear(), 0, 1);
-  const lastOfYear = new Date(today.getFullYear(), 11, 31);
-  const monthRange = { start: toIso(firstOfMonth), end: toIso(lastOfMonth) };
-  const yearRange = { start: toIso(firstOfYear), end: toIso(lastOfYear) };
-
   function updateQuickButtons() {
     const isMonth = customRange && customRange.start === monthRange.start && customRange.end === monthRange.end;
     const isYear = customRange && customRange.start === yearRange.start && customRange.end === yearRange.end;
@@ -94,44 +98,76 @@ window.dashboardView = (() => {
     draw();
   }
 
-  const picker = flatpickr(rangeInput, {
-    mode: 'range',
-    dateFormat: 'Y-m-d',
-    altInput: true,
-    altFormat: 'd/m/Y',
-    locale: 'pt',
-    defaultDate: [firstOfMonth, today],
-    onChange: (selectedDates) => {
-      if (selectedDates.length === 2) {
-        const [start, end] = selectedDates.sort((a, b) => a - b);
-        setRange(toIso(start), toIso(end));
-      }
-    },
-    onClose: (selectedDates) => {
-      if (selectedDates.length === 1) {
-        const iso = toIso(selectedDates[0]);
-        setRange(iso, iso);
-      }
-    },
-  });
+  // Chart.js e Flatpickr só são baixados na primeira visita ao Dashboard —
+  // as outras views (Transações/Perfil/Configurações) não precisam delas.
+  async function ensureInit() {
+    if (initialized) return;
 
-  customRange = { start: toIso(firstOfMonth), end: toIso(today) };
-  customRangeEl.classList.add('active');
-  rangeClearBtn.hidden = false;
-  updateQuickButtons();
+    await Promise.all([
+      scriptLoader.loadStyle('https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css'),
+      scriptLoader.loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js'),
+      scriptLoader
+        .loadScript('https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js')
+        .then(() => scriptLoader.loadScript('https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/pt.js')),
+    ]);
 
-  rangeClearBtn.addEventListener('click', () => {
-    picker.clear();
-    clearRange();
-  });
+    picker = flatpickr(rangeInput, {
+      mode: 'range',
+      dateFormat: 'Y-m-d',
+      altInput: true,
+      altFormat: 'd/m/Y',
+      locale: 'pt',
+      defaultDate: [firstOfMonth, today],
+      onChange: (selectedDates) => {
+        if (selectedDates.length === 2) {
+          const [start, end] = selectedDates.sort((a, b) => a - b);
+          setRange(toIso(start), toIso(end));
+        }
+      },
+      onClose: (selectedDates) => {
+        if (selectedDates.length === 1) {
+          const iso = toIso(selectedDates[0]);
+          setRange(iso, iso);
+        }
+      },
+    });
 
-  quickMonthBtn.addEventListener('click', () => {
-    picker.setDate([firstOfMonth, lastOfMonth], true);
-  });
+    customRange = { start: toIso(firstOfMonth), end: toIso(today) };
+    customRangeEl.classList.add('active');
+    rangeClearBtn.hidden = false;
+    updateQuickButtons();
 
-  quickYearBtn.addEventListener('click', () => {
-    picker.setDate([firstOfYear, lastOfYear], true);
-  });
+    rangeClearBtn.addEventListener('click', () => {
+      picker.clear();
+      clearRange();
+    });
+
+    quickMonthBtn.addEventListener('click', () => {
+      picker.setDate([firstOfMonth, lastOfMonth], true);
+    });
+
+    quickYearBtn.addEventListener('click', () => {
+      picker.setDate([firstOfYear, lastOfYear], true);
+    });
+
+    initialized = true;
+  }
+
+  async function render() {
+    try {
+      await uiLoading.withDelayedSkeleton(
+        async () => {
+          await ensureInit();
+          allTransactions = await api.getTransactions();
+        },
+        { onShow: showSkeleton, onHide: hideSkeleton }
+      );
+      draw();
+    } catch (error) {
+      hideSkeleton();
+      console.error(error);
+    }
+  }
 
   document.addEventListener('transactions:changed', render);
 
